@@ -59,7 +59,7 @@ node {
 
   dir([path: env.ROOT]) {
     // Run build.
-    echo 'Please work... Jenk'
+    echo 'Please work... Jenki'
     updatePullRequest('verify', true)
     // sh 'which docker'
     // sh """${env.ROOT}/contrib/jenkins/init_build.sh"""
