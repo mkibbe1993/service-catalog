@@ -46,11 +46,14 @@ if [[ "$(uname -s)" == "Linux" ]]; then
 
   [[ -n "${NO_DOCKER_COMPILE:-}" ]] && MAKE_VARS+=(NO_DOCKER=1)
 
-  make "${MAKE_VARS[@]}" build \
+  make "${MAKE_VARS[@]}" build test-integration \
     || error_exit 'build linux failed.'
 
-#  make "${MAKE_VARS[@]}" test \
-#    || error_exit 'test linux failed.'
+  #make test-integration \
+  #  || error_exit 'integration tests failed.'
+
+  #make "${MAKE_VARS[@]}" test \
+  #  || error_exit 'test linux failed.'
 
   make "${MAKE_VARS[@]}" images \
     || error_exit 'images linux failed.'

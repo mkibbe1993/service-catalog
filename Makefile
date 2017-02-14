@@ -66,7 +66,7 @@ ifdef NO_DOCKER
 	scBuildImageTarget =
 else
 	# Mount .pkg as pkg so that we save our cached "go build" output files
-	DOCKER_CMD = docker run --rm -ti -v $(PWD):/go/src/$(SC_PKG) \
+	DOCKER_CMD = docker run --rm -i -v $(PWD):/go/src/$(SC_PKG) \
 	  -v $(PWD)/.pkg:/go/pkg scbuildimage
 	scBuildImageTarget = .scBuildImage
 endif
@@ -208,6 +208,9 @@ $(BINDIR)/openapi-gen: vendor/k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen
 # Some prereq stuff
 ###################
 .init: $(scBuildImageTarget) glide.yaml
+	#find /
+	#echo "IN OTHER CONTAINER"
+	#$(DOCKER_CMD) find /
 	$(DOCKER_CMD) glide install --strip-vendor
 	touch $@
 
