@@ -20,7 +20,9 @@ set -o pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 export PATH=${ROOT}/contrib/hack:${PATH}
 
-start-server.sh
+setup-kubectl.sh
+
+which kubectl
 
 # create a few resources
 kubectl create -f contrib/examples/apiserver/broker.yaml

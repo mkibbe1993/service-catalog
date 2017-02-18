@@ -66,7 +66,8 @@ ifdef NO_DOCKER
 	scBuildImageTarget =
 else
 	# Mount .pkg as pkg so that we save our cached "go build" output files
-	DOCKER_CMD = docker run --rm -i -v $(PWD):/go/src/$(SC_PKG) \
+	DOCKER_CMD = docker run --rm -i --net host \
+	  -v $(PWD):/go/src/$(SC_PKG) \
 	  -v $(PWD)/.pkg:/go/pkg scbuildimage
 	scBuildImageTarget = .scBuildImage
 endif
@@ -265,8 +266,7 @@ test-unit: .init build
 	  $(addprefix $(SC_PKG)/,$(TEST_DIRS))
 
 test-integration: .init build
-	contrib/hack/setup-kubectl.sh
-	contrib/hack/test-apiserver.sh
+	contrib/jenkins/test-apiserver-jenkins.sh
 
 clean:
 	rm -rf $(BINDIR)
