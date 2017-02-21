@@ -16,13 +16,44 @@
 set -o errexit
 set -o nounset
 set -o pipefail
+set -x
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-export PATH=${ROOT}/contrib/hack:${PATH}
-
-setup-kubectl.sh
 
 which kubectl
+kubectl
+
+# Clean up old containers if still around
+docker rm -f etcd apiserver > /dev/null 2>&1 || true
+
+# Start etcd, our DB
+docker run --name etcd -d --net host quay.io/coreos/etcd > /dev/null
+
+# And now our API Server
+docker run --name apiserver -d --net host \
+	-v ${ROOT}:/go/src/github.com/kubernetes-incubator/service-catalog \
+	-v ${ROOT}/.var/run/kubernetes-service-catalog:/var/run/kubernetes-service-catalog \
+	-v ${ROOT}/.kube:/root/.kube \
+	scbuildimage \
+	bin/apiserver -v 10 --etcd-servers http://localhost:2379 > /dev/null
+
+sleep 10
+
+APISERVER_IP="$(docker logs apiserver 2>&1 | tr '\r\n' ' ' | sed 's/.*Choosing IP \([0-9.]*\).*/\1/')"
+echo "API Server IP: $APISERVER_IP"
+
+# Waot for apiserver to be up and running
+while ! curl -k "http://${APISERVER_IP}:6443" > /dev/null 2>&1 ; do
+	sleep 1
+done
+
+which kubectl
+
+# Setup our credentials
+kubectl config set-credentials service-catalog-creds --username=admin --password=admin
+kubectl config set-cluster service-catalog-cluster --server="https://${APISERVER_IP}:6443" --certificate-authority=/var/run/kubernetes-service-catalog/apiserver.crt
+kubectl config set-context service-catalog-ctx --cluster=service-catalog-cluster --user=service-catalog-creds
+kubectl config use-context service-catalog-ctx
 
 # create a few resources
 kubectl create -f contrib/examples/apiserver/broker.yaml
@@ -40,4 +71,4 @@ kubectl delete -f contrib/examples/apiserver/serviceclass.yaml
 kubectl delete -f contrib/examples/apiserver/instance.yaml
 kubectl delete -f contrib/examples/apiserver/binding.yaml
 
-stop-server.sh
+

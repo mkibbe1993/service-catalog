@@ -64,14 +64,11 @@ node {
   echo "Service Catalog end-to-end test"
   updatePullRequest('run')
 
-  sh "rm -rf /yolo/swag/*" // TODO: just precautionary, remove soon
   // Checkout the source code.
   checkout scm
-  sh "mkdir -p /yolo/swag/${JOB_NAME}/${BUILD_NUMBER}"
-  sh "cp -rf ${env.WORKSPACE}/* /yolo/swag/${JOB_NAME}/${BUILD_NUMBER}/"
 
-  env.GOPATH = "/yolo/swag/${JOB_NAME}/${BUILD_NUMBER}"
-  env.ROOT = "${env.GOPATH}/${root_path}"
+  env.GOPATH = env.WORKSPACE
+  env.ROOT = "${env.WORKSPACE}/${root_path}"
   env.KUBECONFIG = "${env.ROOT}/kubeconfig"
 
   dir([path: env.ROOT]) {
@@ -88,14 +85,12 @@ node {
       // and the build doesn't depend on it.
       parallel(
         'Cluster': {
-	/*
           withCredentials([file(credentialsId: "${test_account}", variable: 'TEST_SERVICE_ACCOUNT')]) {
             sh """${env.ROOT}/contrib/jenkins/init_cluster.sh ${clustername} \
                   --project ${test_project} \
                   --zone ${test_zone} \
                   --credentials ${env.TEST_SERVICE_ACCOUNT}"""
           }
-	*/
         },
         'Build': {
           sh """${env.ROOT}/contrib/jenkins/build.sh \
@@ -119,8 +114,6 @@ node {
       } catch (Exception e) {
         currentBuild.result = 'FAILURE'
       }
-
-      sh "rm -rf ${env.ROOT}"
     }
 
     if (currentBuild.result == 'FAILURE') {
