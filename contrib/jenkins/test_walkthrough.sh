@@ -23,18 +23,15 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 while [[ $# -gt 0 ]]; do
   case "${1}" in
-    --project)    PROJECT="${2:-}"; shift ;;
+    --registry)   REGISTRY="${2:-}"; shift ;;
+    --version)    VERSION="${2:-}"; shift ;;
 
     *) error_exit "Unrecognized command line parameter: $1" ;;
   esac
   shift
 done
 
-[[ -n "${PROJECT:-}" ]] \
-  || error_exit "Missing required --project parameter"
-
-GCR="gcr.io/${PROJECT}/catalog"
-VERSION="$(git describe --tags --always --abbrev=7 --dirty)" \
+VERSION="${VERSION:-"$(git describe --tags --always --abbrev=7 --dirty)"}" \
   || error_exit 'Cannot determine Git commit SHA'
 
 # Deploying to cluster
@@ -44,20 +41,29 @@ kubectl create namespace test-ns
 
 echo 'Deploying user-provided-service broker...'
 
+VALUES="version=${VERSION}"
+if [[ -n "${REGISTRY:-}" ]]; then
+  VALUES+=",registry=${REGISTRY}"
+fi
+
 retry -n 10 \
     helm install "${ROOT}/charts/ups-broker" \
     --name "ups-broker" \
     --namespace "ups-broker" \
-    --set "version=${VERSION},registry=${GCR}" \
+    --set "${VALUES}" \
   || error_exit 'Error deploy ups broker to cluster.'
 
 echo 'Deploying service catalog...'
+
+VALUES+=',debug=true'
+VALUES+=',insecure=true'
+VALUES+=',apiserver.service.type=LoadBalancer'
 
 retry -n 10 \
     helm install "${ROOT}/charts/catalog" \
     --name "catalog" \
     --namespace "catalog" \
-    --set "version=${VERSION},registry=${GCR},debug=true,insecure=true,apiserver.service.type=LoadBalancer" \
+    --set "${VALUES}" \
   || error_exit 'Error deploying service catalog to cluster.'
 
 # Waiting for everything to come up
@@ -66,11 +72,19 @@ echo 'Waiting on pods to come up...'
 
 wait_for_expected_output -x -e 'ContainerCreating' -n 10 \
     kubectl get pods --namespace ups-broker \
+  || error_exit 'User provided service broker pod took an unexpected amount of time to come up.'
+
+[[ "$(kubectl get pods --namespace ups-broker | grep ups-broker | awk '{print $3}')" == 'Running' ]] \
   || error_exit 'User provided service broker pod did not come up successfully.'
 
 wait_for_expected_output -x -e 'ContainerCreating' -n 10 \
     kubectl get pods --namespace catalog \
   || error_exit 'Service catalog pods did not come up successfully.'
+
+[[ "$(kubectl get pods --namespace catalog | grep apiserver | awk '{print $3}')" == 'Running' ]] \
+  || error_exit 'API server pod did not come up successfully.'
+[[ "$(kubectl get pods --namespace catalog | grep controller | awk '{print $3}')" == 'Running' ]] \
+  || error_exit 'Controller pod did not come up successfully.'
 
 echo 'Waiting on external IP for service catalog API Server...'
 
@@ -83,6 +97,9 @@ wait_for_expected_output -x -e 'pending' -n 10 \
 echo 'Connecting to service catalog API Server...'
 
 API_SERVER_HOST="$(kubectl get services -n catalog | grep 'apiserver' | awk '{print $3}')"
+
+[[ "${API_SERVER_HOST}" =~ ^[0-9.]*$ ]] \
+  || error_exit 'Error when fetching service catalog API Server IP address.'
 
 export KUBECONFIG="${SC_KUBECONFIG}"
 

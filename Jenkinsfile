@@ -102,7 +102,7 @@ node {
 
       // Run through the walkthrough on the cluster.
       sh """${env.ROOT}/contrib/jenkins/test_walkthrough.sh \
-            --project ${test_project}
+            --registry gcr.io/${test_project}/catalog
       """
     } catch (Exception e) {
       currentBuild.result = 'FAILURE'
