@@ -102,7 +102,8 @@ node {
 
       // Run through the walkthrough on the cluster.
       sh """${env.ROOT}/contrib/hack/test_walkthrough.sh \
-            --registry gcr.io/${test_project}/catalog
+            --registry gcr.io/${test_project}/catalog \
+	    --cleanup
       """
     } catch (Exception e) {
       currentBuild.result = 'FAILURE'
