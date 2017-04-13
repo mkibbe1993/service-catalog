@@ -191,8 +191,8 @@ kubectl config set-cluster service-catalog-cluster --server="http://${API_SERVER
 kubectl config set-context service-catalog-ctx --cluster=service-catalog-cluster --user=service-catalog-creds
 kubectl config use-context service-catalog-ctx
 
-retry -n 10 \
-  kubectl get brokers,serviceclasses,instances,bindings \
+retry -n 1 \
+  kubectl get blobls \
   || error_exit 'Issue listing resources from service catalog API server.'
 
 # Create the broker
