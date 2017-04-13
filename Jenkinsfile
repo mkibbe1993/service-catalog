@@ -81,34 +81,30 @@ node {
     def clustername = "jenkins-" + sh([returnStdout: true, script: '''openssl rand \
         -base64 100 | tr -dc a-z0-9 | cut -c -25''']).trim()
 
+    def version = "0d302eb"
+
     try {
       // These are done in parallel since creating the cluster takes a while,
       // and the build doesn't depend on it.
-      parallel(
-        'Cluster': {
-          withCredentials([file(credentialsId: "${test_account}", variable: 'TEST_SERVICE_ACCOUNT')]) {
-            sh """${env.ROOT}/contrib/jenkins/init_cluster.sh ${clustername} \
-                  --project ${test_project} \
-                  --zone ${test_zone} \
-                  --credentials ${env.TEST_SERVICE_ACCOUNT}"""
-          }
-        },
-        'Build & Unit/Integration Tests': {
-          sh """${env.ROOT}/contrib/jenkins/build.sh \
-                --project ${test_project}"""
-        }
-      )
+      withCredentials([file(credentialsId: "${test_account}", variable: 'TEST_SERVICE_ACCOUNT')]) {
+        sh """${env.ROOT}/contrib/jenkins/init_cluster.sh ${clustername} \
+    	    --project ${test_project} \
+	    --zone ${test_zone} \
+	    --credentials ${env.TEST_SERVICE_ACCOUNT}"""
+      }
 
       // Run through the walkthrough on the cluster, once with an etcd-backed API server and once
       // with a TPR-backed one.
       sh """${env.ROOT}/contrib/hack/test_walkthrough.sh \
             --registry gcr.io/${test_project}/catalog/ \
+	    --version ${version} \
             --cleanup \
             --create-artifacts
       """
 
       sh """${env.ROOT}/contrib/hack/test_walkthrough.sh \
             --registry gcr.io/${test_project}/catalog/ \
+	    --version ${version} \
             --with-tpr \
             --cleanup \
             --create-artifacts
