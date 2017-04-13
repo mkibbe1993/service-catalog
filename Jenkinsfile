@@ -61,7 +61,7 @@ def namespace    = 'catalog'
 def root_path    = 'src/github.com/kubernetes-incubator/service-catalog'
 
 node {
-  echo "Service Catalog end-to-end test"
+  echo "Service Catalog end-to-end tests"
 
   sh "sudo rm -rf ${env.WORKSPACE}/*"
 
