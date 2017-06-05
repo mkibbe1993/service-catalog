@@ -39,10 +39,13 @@ def updatePullRequest(flow, success = false) {
     default:
       error('flow can only be run or verify')
   }
-  setGitHubPullRequestStatus(
-      context: env.JOB_NAME,
-      message: message,
-      state: state)
+  step([
+      $class: "GitHubCommitStatusSetter",
+      reposSource: [$class: "ManuallyEnteredRepositorySource", url: "https://github.com/kubernetes-incubator/service-catalog"],
+      contextSource: [$class: "ManuallyEnteredCommitContextSource", context: "${JOB_NAME}"],
+      errorHandlers: [[$class: "ChangingBuildStatusErrorHandler", result: "UNSTABLE"]],
+      statusResultSource: [ $class: "ConditionalStatusResultSource", results: [[$class: "AnyBuildResult", message: message, state: state]] ]
+  ]);
 }
 
 // Verify required parameters
