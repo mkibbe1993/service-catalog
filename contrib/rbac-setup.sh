@@ -1,4 +1,4 @@
-#!/bin/sh --
+#!/bin/bash --
 
 # Copyright 2017 The Kubernetes Authors.
 #
@@ -14,8 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 SVCCAT_NAMESPACE=catalog
 kubectl create namespace ${SVCCAT_NAMESPACE}
 kubectl create serviceaccount server --namespace=${SVCCAT_NAMESPACE}
 kubectl create serviceaccount controller --namespace=${SVCCAT_NAMESPACE}
-kubectl create -f svc-cat-rbac.yaml
+kubectl create -f "${ROOT}/contrib/svc-cat-rbac.yaml"
