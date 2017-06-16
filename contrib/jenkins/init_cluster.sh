@@ -76,8 +76,5 @@ kubectl create clusterrolebinding jenkins-cluster-admin-binding \
     --clusterrole=cluster-admin --user="${ACCOUNT_NAME}" \
   || { echo 'Cannot not create cluster-admin role for service account.'; exit 1; }
 
-${ROOT}/contrib/rbac-setup.sh \
-  || { echo 'Cannot set up RBAC roles.'; exit 1; }
-
 helm init \
   || { echo 'Cannot initialize Helm.'; exit 1; }
