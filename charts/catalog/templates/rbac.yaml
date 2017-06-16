@@ -23,7 +23,7 @@ items:
   - apiGroup: ""
     kind: ServiceAccount
     name: server
-    namespace: catalog
+    namespace: "{{ .Release.Namespace }}"
 
 - apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRoleBinding
@@ -37,7 +37,7 @@ items:
   - apiGroup: ""
     kind: ServiceAccount
     name: server
-    namespace: catalog
+    namespace: "{{ .Release.Namespace }}"
 
 - apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: RoleBinding
@@ -52,7 +52,7 @@ items:
   - apiGroup: ""
     kind: ServiceAccount
     name: server
-    namespace: catalog
+    namespace: "{{ .Release.Namespace }}"
 
 - apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRole
@@ -87,7 +87,7 @@ items:
   - apiGroup: ""
     kind: ServiceAccount
     name: controller
-    namespace: catalog
+    namespace: "{{ .Release.Namespace }}"
 
 # This gives create/update access to an endpoint in kube-system for leader election
 # TODO: use an object other than endpoints, and in the same namespace as the service catalog, not in kube-system
@@ -117,4 +117,4 @@ items:
   - apiGroup: ""
     kind: ServiceAccount
     name: controller
-    namespace: catalog
+    namespace: "{{ .Release.Namespace }}"
