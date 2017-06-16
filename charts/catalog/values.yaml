@@ -54,6 +54,7 @@ apiserver:
     activated: false
     # If specified, audit log goes to specified path.
     logPath: "/tmp/service-catalog-apiserver-audit.log"
+  serviceAccount: server
 controllerManager:
   # controller-manager image to use
   image: quay.io/kubernetes-service-catalog/controller-manager:v0.0.9
@@ -78,4 +79,5 @@ controllerManager:
   leaderElectionNamespace:
     # Whether the controller has option to set leader election namespace.
     activated: false
+  serviceAccount: controller
 useAggregator: false
