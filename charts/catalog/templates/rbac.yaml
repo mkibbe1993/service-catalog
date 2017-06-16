@@ -22,7 +22,7 @@ items:
   subjects:
   - apiGroup: ""
     kind: ServiceAccount
-    name: server
+    name: "{{ .Values.apiserver.serviceAccount }}"
     namespace: "{{ .Release.Namespace }}"
 
 - apiVersion: rbac.authorization.k8s.io/v1beta1
@@ -36,7 +36,7 @@ items:
   subjects:
   - apiGroup: ""
     kind: ServiceAccount
-    name: server
+    name: "{{ .Values.apiserver.serviceAccount }}"
     namespace: "{{ .Release.Namespace }}"
 
 - apiVersion: rbac.authorization.k8s.io/v1beta1
@@ -51,7 +51,7 @@ items:
   subjects:
   - apiGroup: ""
     kind: ServiceAccount
-    name: server
+    name: "{{ .Values.apiserver.serviceAccount }}"
     namespace: "{{ .Release.Namespace }}"
 
 - apiVersion: rbac.authorization.k8s.io/v1beta1
@@ -86,7 +86,7 @@ items:
   subjects:
   - apiGroup: ""
     kind: ServiceAccount
-    name: controller
+    name: "{{ .Values.controllerManager.serviceAccount }}"
     namespace: "{{ .Release.Namespace }}"
 
 # This gives create/update access to an endpoint in kube-system for leader election
@@ -116,5 +116,5 @@ items:
   subjects:
   - apiGroup: ""
     kind: ServiceAccount
-    name: controller
+    name: "{{ .Values.controllerManager.serviceAccount }}"
     namespace: "{{ .Release.Namespace }}"
