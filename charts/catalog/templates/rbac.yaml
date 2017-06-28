@@ -64,8 +64,15 @@ items:
     verbs:     ["create","patch","update"]
   # TODO: do not grant global access, limit to particular secrets referenced from bindings
   - apiGroups: [""]
-    resources: ["secrets","configmaps"]
+    resources: ["secrets"]
+    verbs:     ["get","create"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
     verbs:     ["get"]
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs:     ["get","list","watch"]
+  # access to our service-catalog types
   - apiGroups: ["servicecatalog.k8s.io"]
     resources: ["serviceclasses"]
     verbs:     ["get","list","watch","create","patch","update","delete"]
