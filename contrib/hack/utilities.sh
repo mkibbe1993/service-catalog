@@ -19,6 +19,9 @@
 # Arguments:
 #   $1 - string with an error message
 #   $2 - exit code, defaults to 1
+
+set -x
+
 function error_exit() {
   # ${BASH_SOURCE[1]} is the file name of the caller.
   echo "${BASH_SOURCE[1]}: line ${BASH_LINENO[0]}: ${1:-Unknown Error.} (exit ${2:-1})" 1>&2
