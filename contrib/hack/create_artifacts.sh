@@ -41,6 +41,6 @@ kubectl describe pods -n catalog "${API_SERVER_POD}" > "${LOCATION}/${PREFIX}_ap
 kubectl describe pods -n catalog "${CONTROLLER_MANAGER_POD}" > "${LOCATION}/${PREFIX}_controller-manager_pod.txt"
 
 # Containers
-kubectl logs -n catalog "${API_SERVER_POD}" etcd > "${LOCATION}/${PREFIX}_apiserver_etcd_container.txt"
-kubectl logs -n catalog "${API_SERVER_POD}" apiserver > "${LOCATION}/${PREFIX}_apiserver_apiserver_container.txt"
 kubectl logs -n catalog "${CONTROLLER_MANAGER_POD}" > "${LOCATION}/${PREFIX}_controller-manager_container.txt"
+kubectl logs -n catalog "${API_SERVER_POD}" apiserver > "${LOCATION}/${PREFIX}_apiserver_apiserver_container.txt"
+#kubectl logs -n catalog "${API_SERVER_POD}" etcd > "${LOCATION}/${PREFIX}_apiserver_etcd_container.txt"
