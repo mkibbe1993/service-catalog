@@ -45,7 +45,7 @@ CONTROLLER_MANAGER_IMAGE="${REGISTRY}controller-manager:${VERSION}"
 APISERVER_IMAGE="${REGISTRY}apiserver:${VERSION}"
 UPS_BROKER_IMAGE="${REGISTRY}user-broker:${VERSION}"
 
-echo 'TESTING WALKTHROUGH'
+echo 'TESTIN WALKTHROUGH'
 echo '-------------------'
 echo "Using kubeconfig: ${K8S_KUBECONFIG}"
 echo "Using service catalog kubeconfig: ${SC_KUBECONFIG}"
@@ -285,42 +285,38 @@ wait_for_expected_output -e 'InjectedBindResult' -n 10 \
   || error_exit '"my-secret" not present when listing secrets.'
 
 
-# TODO: Cannot currently test TPR deletion; only delete if using an etcd-backed
-# API server
-if [[ -z "${WITH_TPR:-}" ]]; then
-  # Unbind from the instance
+# Unbind from the instance
 
-  echo 'Unbinding from instance...'
+echo 'Unbinding from instance...'
 
-  kubectl delete -n test-ns bindings ups-binding \
-    || error_exit 'Error when deleting ups-binding.'
+kubectl delete -n test-ns bindings ups-binding \
+  || error_exit 'Error when deleting ups-binding.'
 
-  export KUBECONFIG="${K8S_KUBECONFIG}"
-  wait_for_expected_output -x -e "my-secret" -n 10 \
-      kubectl get secrets -n test-ns \
-    || error_exit '"my-secret" not removed upon deleting ups-binding.'
-  export KUBECONFIG="${SC_KUBECONFIG}"
+export KUBECONFIG="${K8S_KUBECONFIG}"
+wait_for_expected_output -x -e "my-secret" -n 10 \
+    kubectl get secrets -n test-ns \
+  || error_exit '"my-secret" not removed upon deleting ups-binding.'
+export KUBECONFIG="${SC_KUBECONFIG}"
 
-  # Deprovision the instance
+# Deprovision the instance
 
-  echo 'Deprovisioning instance...'
+echo 'Deprovisioning instance...'
 
-  kubectl delete -n test-ns instances ups-instance \
-    || error_exit 'Error when deleting ups-instance.'
+kubectl delete -n test-ns instances ups-instance \
+  || error_exit 'Error when deleting ups-instance.'
 
-  # Delete the broker
+# Delete the broker
 
-  echo 'Deleting broker...'
+echo 'Deleting broker...'
 
-  kubectl delete brokers ups-broker \
-    || error_exit 'Error when deleting ups-broker.'
+kubectl delete brokers ups-broker \
+  || error_exit 'Error when deleting ups-broker.'
 
-  wait_for_expected_output -x -e 'user-provided-service' -n 10 \
-      kubectl get serviceclasses \
-    || {
-      kubectl get serviceclasses
-      error_exit 'Service classes not successfully removed upon deleting ups-broker.'
-    }
-fi
+wait_for_expected_output -x -e 'user-provided-service' -n 10 \
+    kubectl get serviceclasses \
+  || {
+    kubectl get serviceclasses
+    error_exit 'Service classes not successfully removed upon deleting ups-broker.'
+  }
 
 echo 'Walkthrough completed successfully.'
