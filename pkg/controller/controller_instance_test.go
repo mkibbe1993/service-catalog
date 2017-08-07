@@ -19,7 +19,6 @@ package controller
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"reflect"
 	"strings"
@@ -499,11 +498,6 @@ func TestReconcileInstance(t *testing.T) {
 		},
 	})
 
-	// Since synchronous operation, must not make it into the polling queue.
-	if testController.pollingQueue.Len() != 0 {
-		t.Fatalf("Expected the polling queue to be empty")
-	}
-
 	actions := fakeCatalogClient.Actions()
 	assertNumberOfActions(t, actions, 1)
 
@@ -544,10 +538,6 @@ func TestReconcileInstanceAsynchronous(t *testing.T) {
 
 	instance := getTestInstance()
 
-	if testController.pollingQueue.Len() != 0 {
-		t.Fatalf("Expected the polling queue to be empty")
-	}
-
 	if err := testController.reconcileInstance(instance); err != nil {
 		t.Fatalf("This should not fail : %v", err)
 	}
@@ -580,19 +570,6 @@ func TestReconcileInstanceAsynchronous(t *testing.T) {
 	updatedInstance := assertUpdateStatus(t, actions[0], instance)
 	assertInstanceReadyFalse(t, updatedInstance)
 
-	// The item should've been added to the pollingQueue for later processing
-	if testController.pollingQueue.Len() != 1 {
-		t.Fatalf("Expected the asynchronous instance to end up in the polling queue")
-	}
-	item, _ := testController.pollingQueue.Get()
-	if item == nil {
-		t.Fatalf("Did not get back a key from polling queue")
-	}
-	actualKey := item.(string)
-	expectedKey := fmt.Sprintf("%s/%s", instance.Namespace, instance.Name)
-	if actualKey != expectedKey {
-		t.Fatalf("got key as %q expected %q", actualKey, expectedKey)
-	}
 	assertAsyncOpInProgressTrue(t, updatedInstance)
 	assertInstanceLastOperation(t, updatedInstance, testOperation)
 	assertInstanceDashboardURL(t, updatedInstance, testDashboardURL)
@@ -614,10 +591,6 @@ func TestReconcileInstanceAsynchronousNoOperation(t *testing.T) {
 	sharedInformers.ServiceClasses().Informer().GetStore().Add(getTestServiceClass())
 
 	instance := getTestInstance()
-
-	if testController.pollingQueue.Len() != 0 {
-		t.Fatalf("Expected the polling queue to be empty")
-	}
 
 	if err := testController.reconcileInstance(instance); err != nil {
 		t.Fatalf("This should not fail : %v", err)
@@ -651,19 +624,6 @@ func TestReconcileInstanceAsynchronousNoOperation(t *testing.T) {
 	updatedInstance := assertUpdateStatus(t, actions[0], instance)
 	assertInstanceReadyFalse(t, updatedInstance)
 
-	// The item should've been added to the pollingQueue for later processing
-	if testController.pollingQueue.Len() != 1 {
-		t.Fatalf("Expected the asynchronous instance to end up in the polling queue")
-	}
-	item, _ := testController.pollingQueue.Get()
-	if item == nil {
-		t.Fatalf("Did not get back a key from polling queue")
-	}
-	key := item.(string)
-	expectedKey := fmt.Sprintf("%s/%s", instance.Namespace, instance.Name)
-	if key != expectedKey {
-		t.Fatalf("got key as %q expected %q", key, expectedKey)
-	}
 	assertAsyncOpInProgressTrue(t, updatedInstance)
 	assertInstanceLastOperation(t, updatedInstance, "")
 }
@@ -872,10 +832,6 @@ func TestReconcileInstanceWithFailureCondition(t *testing.T) {
 
 	brokerActions := fakeBrokerClient.Actions()
 	assertNumberOfBrokerActions(t, brokerActions, 0)
-
-	if testController.pollingQueue.Len() != 0 {
-		t.Fatalf("Expected the polling queue to be empty")
-	}
 
 	actions := fakeCatalogClient.Actions()
 	assertNumberOfActions(t, actions, 0)
