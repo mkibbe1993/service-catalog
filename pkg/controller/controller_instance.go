@@ -18,6 +18,7 @@ package controller
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/golang/glog"
 	osb "github.com/pmorie/go-open-service-broker-client/v2"
@@ -35,6 +36,8 @@ import (
 // Instance handlers and control-loop
 
 func (c *controller) instanceAdd(obj interface{}) {
+	currentTime := time.Now().UnixNano()
+	glog.Infof("INSTANCE_ADDED! %v", currentTime)
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
 		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
@@ -45,6 +48,8 @@ func (c *controller) instanceAdd(obj interface{}) {
 }
 
 func (c *controller) reconcileInstanceKey(key string) (bool, error) {
+	currentTime := time.Now().UnixNano()
+	glog.Infof("INSTANCE_RECONCILE! %v", currentTime)
 	// For namespace-scoped resources, SplitMetaNamespaceKey splits the key
 	// i.e. "namespace/name" into two separate strings
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
@@ -63,13 +68,18 @@ func (c *controller) reconcileInstanceKey(key string) (bool, error) {
 
 	err = c.reconcileInstance(instance)
 	if err != nil {
+		currentTime = time.Now().UnixNano()
+		glog.Infof("ERROR_RECONCILING: %v, %v", err, currentTime)
 		return false, err
 	}
 
 	// Check if we need to poll on this instance.
 	// Have to re-retrieve instance as it might have changed during reconciliation.
+	currentTime = time.Now().UnixNano()
+	glog.Infof("GETTING_INSTANCE! %v", currentTime)
 	instance, err = c.serviceCatalogClient.Instances(instance.Namespace).Get(name, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
+		glog.Infof("Not doing further work for Instance %v because it has been deleted", key)
 		return false, nil
 	}
 	if err != nil {
@@ -77,10 +87,15 @@ func (c *controller) reconcileInstanceKey(key string) (bool, error) {
 		return false, err
 	}
 
+	currentTime = time.Now().UnixNano()
+	glog.Infof("INSTANCE GOT: %+v, %v", instance, currentTime)
+	glog.Infof("ASYNCOP: %v", instance.Status.AsyncOpInProgress)
 	return instance.Status.AsyncOpInProgress, nil
 }
 
 func (c *controller) instanceUpdate(oldObj, newObj interface{}) {
+	currentTime := time.Now().UnixNano()
+	glog.Infof("INSTANCE_UPDATED! %v", currentTime)
 	c.instanceAdd(newObj)
 }
 
@@ -303,6 +318,8 @@ func (c *controller) reconcileInstance(instance *v1alpha1.Instance) error {
 	// communicating with the broker.  In the future the same logic will
 	// result in an instance that requires update being processed by the
 	// controller.
+	currentTime := time.Now().UnixNano()
+	glog.Infof("INSTANCE_CHECKSUM: %v, %v\n", instance.Status.Checksum, currentTime)
 	if instance.Status.Checksum != nil && instance.DeletionTimestamp == nil {
 		instanceChecksum := checksum.InstanceSpecChecksum(instance.Spec)
 		if instanceChecksum == *instance.Status.Checksum {
@@ -483,7 +500,6 @@ func (c *controller) reconcileInstance(instance *v1alpha1.Instance) error {
 			successProvisionMessage,
 		)
 		c.updateInstanceStatus(toUpdate)
-
 		c.recorder.Eventf(instance, api.EventTypeNormal, successProvisionReason, successProvisionMessage)
 	}
 	return nil
@@ -761,11 +777,14 @@ func setInstanceConditionInternal(toUpdate *v1alpha1.Instance,
 // passed to this method should always be a deep copy.
 func (c *controller) updateInstanceStatus(toUpdate *v1alpha1.Instance) error {
 	glog.V(4).Infof("Updating status for Instance %v/%v", toUpdate.Namespace, toUpdate.Name)
+	currentTime := time.Now().UnixNano()
+	glog.Infof("UPDATING_INSTANCE_STATUS! %v", currentTime)
 	_, err := c.serviceCatalogClient.Instances(toUpdate.Namespace).UpdateStatus(toUpdate)
 	if err != nil {
 		glog.Errorf("Failed to update status for Instance %v/%v: %v", toUpdate.Namespace, toUpdate.Name, err)
 	}
-
+	currentTime = time.Now().UnixNano()
+	glog.Infof("DONE_UPDATING_STATUS! %v", currentTime)
 	return err
 }
 
@@ -828,6 +847,8 @@ func (c *controller) updateInstanceFinalizers(
 }
 
 func (c *controller) instanceDelete(obj interface{}) {
+	currentTime := time.Now().UnixNano()
+	glog.Infof("INSTANCE_DELETE! %v", currentTime)
 	instance, ok := obj.(*v1alpha1.Instance)
 	if instance == nil || !ok {
 		return

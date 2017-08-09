@@ -177,16 +177,24 @@ func worker(queue workqueue.RateLimitingInterface, resourceType string, maxRetri
 		for !exit {
 			exit = func() bool {
 				key, quit := queue.Get()
+				currentTime := time.Now().UnixNano()
+				glog.Infof("PROCESSING_KEY: %v, %v", key, currentTime)
 				if quit {
 					return true
 				}
-				defer queue.Done(key)
+				defer func() {
+					currentTime = time.Now().UnixNano()
+					glog.Infof("FINISHED_PROCESSING_KEY: %v, %v", key, currentTime)
+					queue.Done(key)
+				}()
 
 				shouldPoll, err := reconciler(key.(string))
 				if err == nil {
 					queue.Forget(key)
 
 					if shouldPoll {
+						currentTime = time.Now().UnixNano()
+						glog.Infof("SHOULD_POLL_ADDING_TO_QUEUE: %v, %v", key, currentTime)
 						queue.AddAfter(key, pollingInterval)
 					}
 
@@ -195,6 +203,8 @@ func worker(queue workqueue.RateLimitingInterface, resourceType string, maxRetri
 
 				if queue.NumRequeues(key) < maxRetries {
 					glog.V(4).Infof("Error syncing %s %v: %v", resourceType, key, err)
+					currentTime = time.Now().UnixNano()
+					glog.Infof("ERROR_SO_ADDING_RATE_LIMITED: %v, %v", key, currentTime)
 					queue.AddRateLimited(key)
 					return false
 				}
