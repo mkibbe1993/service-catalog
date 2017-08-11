@@ -18,6 +18,7 @@ package controller
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/golang/glog"
 	osb "github.com/pmorie/go-open-service-broker-client/v2"
@@ -35,86 +36,66 @@ import (
 // Instance handlers and control-loop
 
 func (c *controller) instanceAdd(obj interface{}) {
+	currentTime := time.Now().UnixNano()
+	glog.Infof("INSTANCE_ADDED! %v", currentTime)
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
 		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
 		return
 	}
-	// TODO(vaikas): If the obj (which really is an Instance right?) has
-	// AsyncOpInProgress flag set, just add it directly to c.pollingQueue
-	// here? Why shouldn't we??
+
 	c.instanceQueue.Add(key)
 }
 
-// Async operations on instances have a somewhat convoluted flow in order to
-// ensure that only a single goroutine works on an instance at any given time.
-// The flow is:
-//
-// 1.  When the controller wants to begin polling the state of an operation on
-//     an instance, it calls its beginPollingInstance method (or
-//     calls continuePollingInstance, an alias of that method)
-// 2.  begin/continuePollingInstance do a rate-limited add to the polling queue
-// 3.  the pollingQueue calls requeueInstanceForPoll, which adds the instance's
-//     key to the instance work queue
-// 4.  the worker servicing the instance polling queue forgets the instances key,
-//     requiring the controller to call continuePollingInstance if additional
-//     work is needed.
-// 5.  the instance work queue is the single work queue that actually services
-//     instances by calling reconcileInstance
-
-// requeueInstanceForPoll adds the given instance key to the controller's work
-// queue for instances.  It is used to trigger polling for the status of an
-// async operation on and instance and is called by the worker servicing the
-// instance polling queue.  After requeueInstanceForPoll exits, the worker
-// forgets the key from the polling queue, so the controller must call
-// continuePollingInstance if the instance requires additional polling.
-func (c *controller) requeueInstanceForPoll(key string) error {
-	c.instanceQueue.Add(key)
-
-	return nil
-}
-
-// beginPollingInstance does a rate-limited add of the key for the given
-// instance to the controller's instance polling queue.
-func (c *controller) beginPollingInstance(instance *v1alpha1.Instance) error {
-	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(instance)
-	if err != nil {
-		glog.Errorf("Couldn't create a key for object %+v: %v", instance, err)
-		return fmt.Errorf("Couldn't create a key for object %+v: %v", instance, err)
-	}
-
-	c.pollingQueue.AddRateLimited(key)
-
-	return nil
-}
-
-// continuePollingInstance does a rate-limited add of the key for the given
-// instance to the controller's instance polling queue.
-func (c *controller) continuePollingInstance(instance *v1alpha1.Instance) error {
-	return c.beginPollingInstance(instance)
-}
-
-func (c *controller) reconcileInstanceKey(key string) error {
+func (c *controller) reconcileInstanceKey(key string) (bool, error) {
+	currentTime := time.Now().UnixNano()
+	glog.Infof("INSTANCE_RECONCILE! %v", currentTime)
 	// For namespace-scoped resources, SplitMetaNamespaceKey splits the key
 	// i.e. "namespace/name" into two separate strings
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
-		return err
+		return false, err
 	}
 	instance, err := c.instanceLister.Instances(namespace).Get(name)
 	if errors.IsNotFound(err) {
 		glog.Infof("Not doing work for Instance %v because it has been deleted", key)
-		return nil
+		return false, nil
 	}
 	if err != nil {
 		glog.Errorf("Unable to retrieve Instance %v from store: %v", key, err)
-		return err
+		return false, err
 	}
 
-	return c.reconcileInstance(instance)
+	err = c.reconcileInstance(instance)
+	if err != nil {
+		currentTime = time.Now().UnixNano()
+		glog.Infof("ERROR_RECONCILING: %v, %v", err, currentTime)
+		return false, err
+	}
+
+	// Check if we need to poll on this instance.
+	// Have to re-retrieve instance as it might have changed during reconciliation.
+	currentTime = time.Now().UnixNano()
+	glog.Infof("GETTING_INSTANCE! %v", currentTime)
+	instance, err = c.serviceCatalogClient.Instances(instance.Namespace).Get(name, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		glog.Infof("Not doing further work for Instance %v because it has been deleted", key)
+		return false, nil
+	}
+	if err != nil {
+		glog.Errorf("Unable to retrieve Instance %v from store: %v", key, err)
+		return false, err
+	}
+
+	currentTime = time.Now().UnixNano()
+	glog.Infof("INSTANCE GOT: %+v, %v", instance, currentTime)
+	glog.Infof("ASYNCOP: %v", instance.Status.AsyncOpInProgress)
+	return instance.Status.AsyncOpInProgress, nil
 }
 
 func (c *controller) instanceUpdate(oldObj, newObj interface{}) {
+	currentTime := time.Now().UnixNano()
+	glog.Infof("INSTANCE_UPDATED! %v", currentTime)
 	c.instanceAdd(newObj)
 }
 
@@ -250,11 +231,6 @@ func (c *controller) reconcileInstanceDelete(instance *v1alpha1.Instance) error 
 				return err
 			}
 
-			err = c.beginPollingInstance(instance)
-			if err != nil {
-				return err
-			}
-
 			c.recorder.Eventf(instance, api.EventTypeNormal, asyncDeprovisioningReason, asyncDeprovisioningMessage)
 
 			return nil
@@ -342,6 +318,8 @@ func (c *controller) reconcileInstance(instance *v1alpha1.Instance) error {
 	// communicating with the broker.  In the future the same logic will
 	// result in an instance that requires update being processed by the
 	// controller.
+	currentTime := time.Now().UnixNano()
+	glog.Infof("INSTANCE_CHECKSUM: %v, %v\n", instance.Status.Checksum, currentTime)
 	if instance.Status.Checksum != nil && instance.DeletionTimestamp == nil {
 		instanceChecksum := checksum.InstanceSpecChecksum(instance.Spec)
 		if instanceChecksum == *instance.Status.Checksum {
@@ -510,10 +488,6 @@ func (c *controller) reconcileInstance(instance *v1alpha1.Instance) error {
 		c.updateInstanceStatus(toUpdate)
 
 		c.recorder.Eventf(instance, api.EventTypeNormal, asyncProvisioningReason, asyncProvisioningMessage)
-
-		if err := c.beginPollingInstance(instance); err != nil {
-			return err
-		}
 	} else {
 		glog.V(5).Infof("Successfully provisioned Instance %v/%v of ServiceClass %v at Broker %v: response: %+v", instance.Namespace, instance.Name, serviceClass.Name, brokerName, response)
 
@@ -526,7 +500,6 @@ func (c *controller) reconcileInstance(instance *v1alpha1.Instance) error {
 			successProvisionMessage,
 		)
 		c.updateInstanceStatus(toUpdate)
-
 		c.recorder.Eventf(instance, api.EventTypeNormal, successProvisionReason, successProvisionMessage)
 	}
 	return nil
@@ -651,12 +624,6 @@ func (c *controller) pollInstance(serviceClass *v1alpha1.ServiceClass, servicePl
 				message,
 			)
 		}
-
-		err = c.continuePollingInstance(instance)
-		if err != nil {
-			return err
-		}
-		return fmt.Errorf("last operation not completed (still in progress) for %v/%v", instance.Namespace, instance.Name)
 	case osb.StateSucceeded:
 		// Update the instance to reflect that an async operation is no longer
 		// in progress.
@@ -810,11 +777,14 @@ func setInstanceConditionInternal(toUpdate *v1alpha1.Instance,
 // passed to this method should always be a deep copy.
 func (c *controller) updateInstanceStatus(toUpdate *v1alpha1.Instance) error {
 	glog.V(4).Infof("Updating status for Instance %v/%v", toUpdate.Namespace, toUpdate.Name)
+	currentTime := time.Now().UnixNano()
+	glog.Infof("UPDATING_INSTANCE_STATUS! %v", currentTime)
 	_, err := c.serviceCatalogClient.Instances(toUpdate.Namespace).UpdateStatus(toUpdate)
 	if err != nil {
 		glog.Errorf("Failed to update status for Instance %v/%v: %v", toUpdate.Namespace, toUpdate.Name, err)
 	}
-
+	currentTime = time.Now().UnixNano()
+	glog.Infof("DONE_UPDATING_STATUS! %v", currentTime)
 	return err
 }
 
@@ -877,6 +847,8 @@ func (c *controller) updateInstanceFinalizers(
 }
 
 func (c *controller) instanceDelete(obj interface{}) {
+	currentTime := time.Now().UnixNano()
+	glog.Infof("INSTANCE_DELETE! %v", currentTime)
 	instance, ok := obj.(*v1alpha1.Instance)
 	if instance == nil || !ok {
 		return

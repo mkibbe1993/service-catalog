@@ -51,8 +51,8 @@ const (
 	// 5ms, 10ms, 20ms, 40ms, 80ms, 160ms, 320ms, 640ms, 1.3s, 2.6s, 5.1s, 10.2s, 20.4s, 41s, 82s
 	maxRetries = 15
 	//
-	pollingStartInterval      = 1 * time.Second
-	pollingMaxBackoffDuration = 1 * time.Hour
+	//pollingInterval is the length of time between each polling attempt for a currently ongoing asynchronous operation.
+	pollingInterval = 30 * time.Second
 )
 
 // NewController returns a new Open Service Broker catalog controller.
@@ -79,7 +79,6 @@ func NewController(
 		serviceClassQueue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "service-class"),
 		instanceQueue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "instance"),
 		bindingQueue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "binding"),
-		pollingQueue:           workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(pollingStartInterval, pollingMaxBackoffDuration), "poller"),
 	}
 
 	brokerInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -156,7 +155,6 @@ func (c *controller) Run(workers int, stopCh <-chan struct{}) {
 		go wait.Until(worker(c.serviceClassQueue, "ServiceClass", maxRetries, c.reconcileServiceClassKey), time.Second, stopCh)
 		go wait.Until(worker(c.instanceQueue, "Instance", maxRetries, c.reconcileInstanceKey), time.Second, stopCh)
 		go wait.Until(worker(c.bindingQueue, "Binding", maxRetries, c.reconcileBindingKey), time.Second, stopCh)
-		go wait.Until(worker(c.pollingQueue, "Poller", maxRetries, c.requeueInstanceForPoll), time.Second, stopCh)
 	}
 
 	<-stopCh
@@ -170,27 +168,43 @@ func (c *controller) Run(workers int, stopCh <-chan struct{}) {
 }
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
-// If reconciler returns an error, requeue the item up to maxRetries before giving up.
+// If the reconciler returns that it should poll, requeue the item after the default polling interval elapses.
+// If the reconciler returns an error, requeue the item up to maxRetries before giving up.
 // It enforces that the reconciler is never invoked concurrently with the same key.
-func worker(queue workqueue.RateLimitingInterface, resourceType string, maxRetries int, reconciler func(key string) error) func() {
+func worker(queue workqueue.RateLimitingInterface, resourceType string, maxRetries int, reconciler func(key string) (bool, error)) func() {
 	return func() {
 		exit := false
 		for !exit {
 			exit = func() bool {
 				key, quit := queue.Get()
+				currentTime := time.Now().UnixNano()
+				glog.Infof("PROCESSING_KEY: %v, %v", key, currentTime)
 				if quit {
 					return true
 				}
-				defer queue.Done(key)
+				defer func() {
+					currentTime = time.Now().UnixNano()
+					glog.Infof("FINISHED_PROCESSING_KEY: %v, %v", key, currentTime)
+					queue.Done(key)
+				}()
 
-				err := reconciler(key.(string))
+				shouldPoll, err := reconciler(key.(string))
 				if err == nil {
 					queue.Forget(key)
+
+					if shouldPoll {
+						currentTime = time.Now().UnixNano()
+						glog.Infof("SHOULD_POLL_ADDING_TO_QUEUE: %v, %v", key, currentTime)
+						queue.AddAfter(key, pollingInterval)
+					}
+
 					return false
 				}
 
 				if queue.NumRequeues(key) < maxRetries {
 					glog.V(4).Infof("Error syncing %s %v: %v", resourceType, key, err)
+					currentTime = time.Now().UnixNano()
+					glog.Infof("ERROR_SO_ADDING_RATE_LIMITED: %v, %v", key, currentTime)
 					queue.AddRateLimited(key)
 					return false
 				}
