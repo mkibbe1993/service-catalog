@@ -35,15 +35,39 @@ import (
 // Instance handlers and control-loop
 
 func (c *controller) instanceAdd(obj interface{}) {
+	glog.Infof("INSTANCE_ADDED!")
+
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
 		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
 		return
 	}
-	// TODO(vaikas): If the obj (which really is an Instance right?) has
-	// AsyncOpInProgress flag set, just add it directly to c.pollingQueue
-	// here? Why shouldn't we??
+
 	c.instanceQueue.Add(key)
+}
+
+func (c *controller) instanceUpdate(oldObj, newObj interface{}) {
+	glog.Infof("INSTANCE_UPDATED!")
+
+	// A polling instance will be added to the polling queue by the reconciler.
+	// We only need to take care of non-polling instances here.
+	instance := newObj.(*v1alpha1.Instance)
+	if !instance.Status.AsyncOpInProgress {
+		c.instanceAdd(newObj)
+	} else {
+		glog.Infof("INSTANCE_UPDATE NOT ADDED TO QUEUE BECAUSE CURRENTLY POLLING")
+	}
+}
+
+func (c *controller) instanceDelete(obj interface{}) {
+	glog.Infof("INSTANCE_DELETED!")
+
+	instance, ok := obj.(*v1alpha1.Instance)
+	if instance == nil || !ok {
+		return
+	}
+
+	glog.V(4).Infof("Received delete event for Instance %v/%v; no further processing will occur", instance.Namespace, instance.Name)
 }
 
 // Async operations on instances have a somewhat convoluted flow in order to
@@ -69,6 +93,8 @@ func (c *controller) instanceAdd(obj interface{}) {
 // forgets the key from the polling queue, so the controller must call
 // continuePollingInstance if the instance requires additional polling.
 func (c *controller) requeueInstanceForPoll(key string) error {
+	glog.Infof("INSTANCE_REQUEUE_FOR_POLL")
+
 	c.instanceQueue.Add(key)
 
 	return nil
@@ -77,6 +103,8 @@ func (c *controller) requeueInstanceForPoll(key string) error {
 // beginPollingInstance does a rate-limited add of the key for the given
 // instance to the controller's instance polling queue.
 func (c *controller) beginPollingInstance(instance *v1alpha1.Instance) error {
+	glog.Infof("INSTANCE_BEGIN_POLLING")
+
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(instance)
 	if err != nil {
 		glog.Errorf("Couldn't create a key for object %+v: %v", instance, err)
@@ -91,10 +119,29 @@ func (c *controller) beginPollingInstance(instance *v1alpha1.Instance) error {
 // continuePollingInstance does a rate-limited add of the key for the given
 // instance to the controller's instance polling queue.
 func (c *controller) continuePollingInstance(instance *v1alpha1.Instance) error {
+	glog.Infof("INSTANCE_CONTINUE_POLLING")
+
 	return c.beginPollingInstance(instance)
 }
 
+// finishPollingInstance removes the instance's key from the controller's instance
+// polling queue.
+func (c *controller) finishPollingInstance(instance *v1alpha1.Instance) error {
+	glog.Infof("INSTANCE_FINISH_POLLING")
+
+	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(instance)
+	if err != nil {
+		glog.Errorf("Couldn't create a key for object %+v: %v", instance, err)
+		return fmt.Errorf("Couldn't create a key for object %+v: %v", instance, err)
+	}
+
+	c.pollingQueue.Forget(key)
+
+	return nil
+}
+
 func (c *controller) reconcileInstanceKey(key string) error {
+	glog.Infof("INSTANCE_RECONCILE")
 	// For namespace-scoped resources, SplitMetaNamespaceKey splits the key
 	// i.e. "namespace/name" into two separate strings
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
@@ -112,10 +159,6 @@ func (c *controller) reconcileInstanceKey(key string) error {
 	}
 
 	return c.reconcileInstance(instance)
-}
-
-func (c *controller) instanceUpdate(oldObj, newObj interface{}) {
-	c.instanceAdd(newObj)
 }
 
 // reconcileInstanceDelete is responsible for handling any instance whose
@@ -697,6 +740,11 @@ func (c *controller) pollInstance(serviceClass *v1alpha1.ServiceClass, servicePl
 				successProvisionMessage,
 			)
 		}
+
+		err = c.finishPollingInstance(instance)
+		if err != nil {
+			return err
+		}
 	case osb.StateFailed:
 		description := ""
 		if response.Description != nil {
@@ -727,6 +775,11 @@ func (c *controller) pollInstance(serviceClass *v1alpha1.ServiceClass, servicePl
 			msg,
 		)
 		c.recorder.Event(instance, api.EventTypeWarning, errorDeprovisionCalledReason, s)
+
+		err = c.finishPollingInstance(instance)
+		if err != nil {
+			return err
+		}
 	default:
 		glog.Warningf("Got invalid state in LastOperationResponse: %q", response.State)
 		return fmt.Errorf("Got invalid state in LastOperationResponse: %q", response.State)
@@ -874,13 +927,4 @@ func (c *controller) updateInstanceFinalizers(
 		glog.Errorf("Error updating %v: %v", logContext, err)
 	}
 	return err
-}
-
-func (c *controller) instanceDelete(obj interface{}) {
-	instance, ok := obj.(*v1alpha1.Instance)
-	if instance == nil || !ok {
-		return
-	}
-
-	glog.V(4).Infof("Received delete event for Instance %v/%v; no further processing will occur", instance.Namespace, instance.Name)
 }
