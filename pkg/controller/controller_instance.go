@@ -35,6 +35,8 @@ import (
 // Instance handlers and control-loop
 
 func (c *controller) instanceAdd(obj interface{}) {
+	glog.Infof("INSTANCE_ADDED!")
+
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
 		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
@@ -45,15 +47,21 @@ func (c *controller) instanceAdd(obj interface{}) {
 }
 
 func (c *controller) instanceUpdate(oldObj, newObj interface{}) {
+	glog.Infof("INSTANCE_UPDATED!")
+
 	// A polling instance will be added to the polling queue by the reconciler.
 	// We only need to take care of non-polling instances here.
 	instance := newObj.(*v1alpha1.Instance)
 	if !instance.Status.AsyncOpInProgress {
 		c.instanceAdd(newObj)
+	} else {
+		glog.Infof("INSTANCE_UPDATE NOT ADDED TO QUEUE BECAUSE CURRENTLY POLLING")
 	}
 }
 
 func (c *controller) instanceDelete(obj interface{}) {
+	glog.Infof("INSTANCE_DELETED!")
+
 	instance, ok := obj.(*v1alpha1.Instance)
 	if instance == nil || !ok {
 		return
@@ -85,6 +93,8 @@ func (c *controller) instanceDelete(obj interface{}) {
 // forgets the key from the polling queue, so the controller must call
 // continuePollingInstance if the instance requires additional polling.
 func (c *controller) requeueInstanceForPoll(key string) error {
+	glog.Infof("INSTANCE_REQUEUE_FOR_POLL")
+
 	c.instanceQueue.Add(key)
 
 	return nil
@@ -93,6 +103,8 @@ func (c *controller) requeueInstanceForPoll(key string) error {
 // beginPollingInstance does a rate-limited add of the key for the given
 // instance to the controller's instance polling queue.
 func (c *controller) beginPollingInstance(instance *v1alpha1.Instance) error {
+	glog.Infof("INSTANCE_BEGIN_POLLING")
+
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(instance)
 	if err != nil {
 		glog.Errorf("Couldn't create a key for object %+v: %v", instance, err)
@@ -107,12 +119,16 @@ func (c *controller) beginPollingInstance(instance *v1alpha1.Instance) error {
 // continuePollingInstance does a rate-limited add of the key for the given
 // instance to the controller's instance polling queue.
 func (c *controller) continuePollingInstance(instance *v1alpha1.Instance) error {
+	glog.Infof("INSTANCE_CONTINUE_POLLING")
+
 	return c.beginPollingInstance(instance)
 }
 
 // finishPollingInstance removes the instance's key from the controller's instance
 // polling queue.
 func (c *controller) finishPollingInstance(instance *v1alpha1.Instance) error {
+	glog.Infof("INSTANCE_FINISH_POLLING")
+
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(instance)
 	if err != nil {
 		glog.Errorf("Couldn't create a key for object %+v: %v", instance, err)
@@ -125,6 +141,7 @@ func (c *controller) finishPollingInstance(instance *v1alpha1.Instance) error {
 }
 
 func (c *controller) reconcileInstanceKey(key string) error {
+	glog.Infof("INSTANCE_RECONCILE")
 	// For namespace-scoped resources, SplitMetaNamespaceKey splits the key
 	// i.e. "namespace/name" into two separate strings
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
