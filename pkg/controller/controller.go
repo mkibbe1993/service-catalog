@@ -152,11 +152,11 @@ func (c *controller) Run(workers int, stopCh <-chan struct{}) {
 	glog.Info("Starting service-catalog controller")
 
 	for i := 0; i < workers; i++ {
-		go wait.Until(worker(c.brokerQueue, "Broker", maxRetries, c.reconcileBrokerKey), time.Second, stopCh)
-		go wait.Until(worker(c.serviceClassQueue, "ServiceClass", maxRetries, c.reconcileServiceClassKey), time.Second, stopCh)
-		go wait.Until(worker(c.instanceQueue, "Instance", maxRetries, c.reconcileInstanceKey), time.Second, stopCh)
-		go wait.Until(worker(c.bindingQueue, "Binding", maxRetries, c.reconcileBindingKey), time.Second, stopCh)
-		go wait.Until(worker(c.pollingQueue, "Poller", maxRetries, c.requeueInstanceForPoll), time.Second, stopCh)
+		go wait.Until(worker(c.brokerQueue, "Broker", maxRetries, true, c.reconcileBrokerKey), time.Second, stopCh)
+		go wait.Until(worker(c.serviceClassQueue, "ServiceClass", maxRetries, true, c.reconcileServiceClassKey), time.Second, stopCh)
+		go wait.Until(worker(c.instanceQueue, "Instance", maxRetries, true, c.reconcileInstanceKey), time.Second, stopCh)
+		go wait.Until(worker(c.bindingQueue, "Binding", maxRetries, true, c.reconcileBindingKey), time.Second, stopCh)
+		go wait.Until(pollingWorker(c.pollingQueue, "Poller", maxRetries, false, c.requeueInstanceForPoll), time.Second, stopCh)
 	}
 
 	<-stopCh
@@ -172,7 +172,7 @@ func (c *controller) Run(workers int, stopCh <-chan struct{}) {
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
 // If reconciler returns an error, requeue the item up to maxRetries before giving up.
 // It enforces that the reconciler is never invoked concurrently with the same key.
-func worker(queue workqueue.RateLimitingInterface, resourceType string, maxRetries int, reconciler func(key string) error) func() {
+func worker(queue workqueue.RateLimitingInterface, resourceType string, maxRetries int, forgetAfterSuccess bool, reconciler func(key string) error) func() {
 	return func() {
 		exit := false
 		for !exit {
@@ -185,7 +185,9 @@ func worker(queue workqueue.RateLimitingInterface, resourceType string, maxRetri
 
 				err := reconciler(key.(string))
 				if err == nil {
-					queue.Forget(key)
+					if forgetAfterSuccess {
+						queue.Forget(key)
+					}
 					return false
 				}
 
