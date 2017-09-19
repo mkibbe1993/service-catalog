@@ -64,6 +64,7 @@ fi
 VALUES=()
 VALUES+="controllerManager.image=${CONTROLLER_MANAGER_IMAGE}"
 VALUES+=",apiserver.image=${APISERVER_IMAGE}"
+VALUES+=",apiserver.auth.enabled=true"
 VALUES+=",apiserver.service.type=NodePort"
 VALUES+=",apiserver.service.nodePort.securePort=30443"
 if [[ "${WITH_TPR}" == true ]]; then
