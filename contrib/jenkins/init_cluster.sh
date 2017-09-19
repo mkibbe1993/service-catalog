@@ -63,7 +63,7 @@ CLUSTER_VERSION="$(gcloud container get-server-config --zone "${ZONE}" \
 echo "Using cluster version ${CLUSTER_VERSION}"
 
 gcloud container clusters create "${CLUSTERNAME}" --project="${PROJECT}" --zone="${ZONE}" \
-  --cluster-version "${CLUSTER_VERSION}" \
+  --cluster-version "${CLUSTER_VERSION}" --no-enable-legacy-authorization \
   || { echo 'Cannot create cluster.'; exit 1; }
 
 echo "Using cluster ${CLUSTERNAME}."
@@ -71,11 +71,10 @@ echo "Using cluster ${CLUSTERNAME}."
 gcloud container clusters get-credentials "${CLUSTERNAME}" --project="${PROJECT}" --zone="${ZONE}" \
   || { echo 'Cannot get credentials for cluster.'; exit 1; }
 
-# On GKE you need to give your user proper permissions in order to create new
-# cluster roles. Needed for RBAC setup.
-ACCOUNT_NAME="$(gcloud info | grep Account | sed 's/.*\[\(.*\)\]/\1/')"
-kubectl create clusterrolebinding jenkins-cluster-admin-binding \
-    --clusterrole=cluster-admin --user="${ACCOUNT_NAME}" \
+# Need to give tiller proper permissions in order to create RBAC roles.
+kubectl create clusterrolebinding tiller-cluster-admin \
+  --clusterrole=cluster-admin \
+  --serviceaccount=kube-system:default \
   || { echo 'Cannot not create cluster-admin role for service account.'; exit 1; }
 
 helm init \

@@ -6,6 +6,7 @@
 
 ### Introduction
 
+
 The service-catalog project is in incubation to bring integration with service
 brokers to the Kubernetes ecosystem via the [Open Service Broker API](https://github.com/openservicebrokerapi/servicebroker).
 
