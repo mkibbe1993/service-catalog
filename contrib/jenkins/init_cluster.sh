@@ -63,7 +63,7 @@ CLUSTER_VERSION="$(gcloud container get-server-config --zone "${ZONE}" \
 echo "Using cluster version ${CLUSTER_VERSION}"
 
 gcloud container clusters create "${CLUSTERNAME}" --project="${PROJECT}" --zone="${ZONE}" \
-  --cluster-version "${CLUSTER_VERSION}" \
+  --cluster-version "${CLUSTER_VERSION}" --no-enable-legacy-authorization \
   || { echo 'Cannot create cluster.'; exit 1; }
 
 echo "Using cluster ${CLUSTERNAME}."
