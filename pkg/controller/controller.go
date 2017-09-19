@@ -182,11 +182,15 @@ func worker(queue workqueue.RateLimitingInterface, resourceType string, maxRetri
 		exit := false
 		for !exit {
 			exit = func() bool {
+				glog.Infof("PROCESSING_KEY: %v")
 				key, quit := queue.Get()
 				if quit {
 					return true
 				}
-				defer queue.Done(key)
+				defer func() {
+					glog.Infof("FINISHED_PROCESSING_KEY: %v", key)
+					queue.Done(key)
+				}()
 
 				err := reconciler(key.(string))
 				if err == nil {
