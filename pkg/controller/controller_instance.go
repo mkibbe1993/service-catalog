@@ -492,12 +492,12 @@ func (c *controller) reconcileServiceInstanceDelete(instance *v1beta1.ServiceIns
 		return c.processDeprovisionFailure(instance, readyCond, failedCond)
 	}
 
-	serviceClass, servicePlan, brokerName, brokerClient, err := c.getClusterServiceClassPlanAndClusterServiceBroker(instance)
+	serviceClass, _, brokerName, brokerClient, err := c.getClusterServiceClassPlanAndClusterServiceBroker(instance)
 	if err != nil {
 		return c.handleServiceInstanceReconciliationError(instance, err)
 	}
 
-	request, err := c.prepareDeprovisionRequest(instance, serviceClass, servicePlan)
+	request, err := c.prepareDeprovisionRequest(instance, serviceClass)
 	if err != nil {
 		return c.handleServiceInstanceReconciliationError(instance, err)
 	}
@@ -1324,30 +1324,33 @@ func (c *controller) prepareUpdateInstanceRequest(instance *v1beta1.ServiceInsta
 
 // prepareDeprovisionRequest creates a deprovision request object to be passed
 // to the broker client to deprovision the given instance.
-func (c *controller) prepareDeprovisionRequest(instance *v1beta1.ServiceInstance, serviceClass *v1beta1.ClusterServiceClass, servicePlan *v1beta1.ClusterServicePlan) (*osb.DeprovisionRequest, error) {
-	rh, err := c.prepareRequestHelper(instance, serviceClass, servicePlan)
-	if err != nil {
-		return nil, err
-	}
-
-	var servicePlanExternalID string
-	if instance.Status.ExternalProperties != nil {
-		servicePlanExternalID = instance.Status.ExternalProperties.ClusterServicePlanExternalID
-	} else if servicePlan != nil {
-		servicePlanExternalID = servicePlan.Spec.ExternalID
-	} else {
-		return nil, &operationError{
-			reason:  errorUnknownServicePlanReason,
-			message: errorUnknownServicePlanMessage,
-		}
-	}
-
+func (c *controller) prepareDeprovisionRequest(instance *v1beta1.ServiceInstance, serviceClass *v1beta1.ClusterServiceClass) (*osb.DeprovisionRequest, error) {
 	request := &osb.DeprovisionRequest{
 		InstanceID:          instance.Spec.ExternalID,
 		ServiceID:           serviceClass.Spec.ExternalID,
-		PlanID:              servicePlanExternalID,
-		OriginatingIdentity: rh.originatingIdentity,
 		AcceptsIncomplete:   true,
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(scfeatures.OriginatingIdentity) {
+		originatingIdentity, err := buildOriginatingIdentity(instance.Spec.UserInfo)
+		if err != nil {
+			return nil, &operationError{
+				reason:  errorWithOriginatingIdentity,
+				message: fmt.Sprintf("Error building originating identity headers: %v", err),
+			}
+		}
+		request.OriginatingIdentity = originatingIdentity
+	}
+
+	if instance.Status.ExternalProperties != nil {
+		// Regular deprovision
+		request.PlanID = instance.Status.ExternalProperties.ClusterServicePlanExternalID
+	} else if instance.Status.InProgressProperties != nil {
+		// Orphan mitigation
+		request.PlanID = instance.Status.InProgressProperties.ClusterServicePlanExternalID
+	} else {
+		// logical error with controller
+		return nil, fmt.Errorf("could not find plan ID to use for deprovision")
 	}
 
 	return request, nil

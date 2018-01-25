@@ -1788,6 +1788,7 @@ func TestReconcileServiceInstanceDeleteFailedProvisionWithRequest(t *testing.T) 
 	instance.ObjectMeta.DeletionTimestamp = &metav1.Time{}
 	instance.ObjectMeta.Finalizers = []string{v1beta1.FinalizerServiceCatalog}
 	instance.Status.ExternalProperties = nil
+	instance.Status.InProgressProperties = &v1beta1.ServiceInstancePropertiesState{ClusterServicePlanExternalID: testClusterServicePlanGUID}
 	instance.Status.DeprovisionStatus = v1beta1.ServiceInstanceDeprovisionStatusRequired
 
 	instance.Generation = 2
@@ -3363,6 +3364,7 @@ func TestReconcileInstanceDeleteUsingOriginatingIdentity(t *testing.T) {
 			// ReconciledGeneration set as that implies a previous success.
 			instance.Generation = 2
 			instance.Status.ReconciledGeneration = 1
+			instance.Status.ExternalProperties = &v1beta1.ServiceInstancePropertiesState{ClusterServicePlanExternalID: testClusterServicePlanGUID}
 			instance.Status.DeprovisionStatus = v1beta1.ServiceInstanceDeprovisionStatusRequired
 			if tc.includeUserInfo {
 				instance.Spec.UserInfo = testUserInfo
@@ -3757,6 +3759,7 @@ func TestReconcileServiceInstanceOrphanMitigation(t *testing.T) {
 			instance := getTestServiceInstanceWithRefs()
 			instance.ObjectMeta.Finalizers = []string{v1beta1.FinalizerServiceCatalog}
 			instance.Status.CurrentOperation = v1beta1.ServiceInstanceOperationProvision
+			instance.Status.InProgressProperties = &v1beta1.ServiceInstancePropertiesState{}
 			instance.Status.OrphanMitigationInProgress = true
 			instance.Status.DeprovisionStatus = v1beta1.ServiceInstanceDeprovisionStatusRequired
 
@@ -5087,7 +5090,7 @@ func TestReconcileServiceInstanceDeleteDuringOngoingOperation(t *testing.T) {
 	instance.Status.CurrentOperation = v1beta1.ServiceInstanceOperationProvision
 	startTime := metav1.NewTime(time.Now().Add(-1 * time.Hour))
 	instance.Status.OperationStartTime = &startTime
-	instance.Status.InProgressProperties = &v1beta1.ServiceInstancePropertiesState{}
+	instance.Status.InProgressProperties = &v1beta1.ServiceInstancePropertiesState{ClusterServicePlanExternalID: testClusterServicePlanGUID}
 
 	fakeCatalogClient.AddReactor("get", "serviceinstances", func(action clientgotesting.Action) (bool, runtime.Object, error) {
 		return true, instance, nil
@@ -5141,7 +5144,7 @@ func TestReconcileServiceInstanceDeleteDuringOngoingOperation(t *testing.T) {
 
 // TestReconcileServiceInstanceDeleteDuringOrphanMitigation tests deleting an
 // instance that is undergoing orphan mitigation.
-func TestReconcileServiceInstanceDeleteWithOngoingOperation(t *testing.T) {
+func TestReconcileServiceInstanceDeleteDuringOrphanMitigation(t *testing.T) {
 	fakeKubeClient, fakeCatalogClient, fakeClusterServiceBrokerClient, testController, sharedInformers := newTestController(t, fakeosb.FakeClientConfiguration{
 		DeprovisionReaction: &fakeosb.DeprovisionReaction{
 			Response: &osb.DeprovisionResponse{},
@@ -5159,6 +5162,7 @@ func TestReconcileServiceInstanceDeleteWithOngoingOperation(t *testing.T) {
 	startTime := metav1.NewTime(time.Now().Add(-1 * time.Hour))
 	instance.Status.OperationStartTime = &startTime
 	instance.Status.OrphanMitigationInProgress = true
+	instance.Status.InProgressProperties = &v1beta1.ServiceInstancePropertiesState{ClusterServicePlanExternalID: testClusterServicePlanGUID}
 
 	fakeCatalogClient.AddReactor("get", "serviceinstances", func(action clientgotesting.Action) (bool, runtime.Object, error) {
 		return true, instance, nil
