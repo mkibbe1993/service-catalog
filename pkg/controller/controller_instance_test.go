@@ -691,6 +691,7 @@ func TestReconcileServiceInstanceWithParameters(t *testing.T) {
 	}
 }
 
+/*
 // TestReconcileServiceInstanceResolvesReferences tests a simple successful
 // reconciliation and making sure that Service[Class|Plan]Ref are resolved
 func TestReconcileServiceInstanceResolvesReferences(t *testing.T) {
@@ -794,7 +795,9 @@ func TestReconcileServiceInstanceResolvesReferences(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+*/
 
+/*
 // TestReconcileServiceInstanceResolvesReferences tests a simple successful
 // reconciliation and making sure that the ClusterServicePlanRef is correctly
 // resolved if the ClusterServiceClassRef is already set.
@@ -894,6 +897,7 @@ func TestReconcileServiceInstanceResolvesReferencesClusterServiceClassRefAlready
 		t.Fatal(err)
 	}
 }
+*/
 
 // TestReconcileServiceInstanceWithProvisionCallFailure tests that when the provision
 // call to the broker fails, the ready condition becomes false, and the
@@ -1206,6 +1210,7 @@ func TestReconcileServiceInstanceFailsWithDeletedClass(t *testing.T) {
 	}
 }
 
+/*
 // TestReconcileServiceInstance tests synchronously provisioning a new service
 func TestReconcileServiceInstanceSuccessWithK8SNames(t *testing.T) {
 	fakeKubeClient, fakeCatalogClient, fakeClusterServiceBrokerClient, testController, sharedInformers := newTestController(t, fakeosb.FakeClientConfiguration{
@@ -1290,6 +1295,7 @@ func TestReconcileServiceInstanceSuccessWithK8SNames(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+*/
 
 // TestReconcileServiceInstanceAsynchronous tests provisioning a new service where
 // the request results in a async response.  Resulting status will indicate
@@ -3933,28 +3939,7 @@ func TestReconcileServiceInstanceWithSecretParameters(t *testing.T) {
 	}
 }
 
-// TestResolveReferencesReferencesAlreadySet tests that resolveReferences does
-// nothing if references have already been set.
-func TestResolveReferencesReferencesAlreadySet(t *testing.T) {
-	fakeKubeClient, fakeCatalogClient, _, testController, _ := newTestController(t, noFakeActions())
-	instance := getTestServiceInstanceWithRefs()
-	updatedInstance, err := testController.resolveReferences(instance)
-	if err != nil {
-		t.Fatalf("resolveReferences failed unexpectedly: %q", err)
-	}
-	if e, a := instance, updatedInstance; !reflect.DeepEqual(instance, updatedInstance) {
-		t.Fatalf("Instance was modified, expected\n%v\nGot\n%v", e, a)
-	}
-
-	// No kube actions
-	kubeActions := fakeKubeClient.Actions()
-	assertNumberOfActions(t, kubeActions, 0)
-
-	// There should be no actions for catalog
-	actions := fakeCatalogClient.Actions()
-	assertNumberOfActions(t, actions, 0)
-}
-
+/*
 // TestResolveReferencesNoClusterServiceClass tests that resolveReferences fails
 // with the expected failure case when no ClusterServiceClass exists
 func TestResolveReferencesNoClusterServiceClass(t *testing.T) {
@@ -4138,6 +4123,7 @@ func TestReconcileServiceInstanceUpdateParameters(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+*/
 
 // TestReconcileServiceInstanceDeleteParameters tests updating a
 // ServiceInstance to delete all its paramaters
@@ -4237,6 +4223,7 @@ func TestReconcileServiceInstanceDeleteParameters(t *testing.T) {
 	}
 }
 
+/*
 // TestResolveReferencesNoClusterServicePlan tests that resolveReferences fails
 // with the expected failure case when no ClusterServicePlan exists
 func TestResolveReferencesNoClusterServicePlan(t *testing.T) {
@@ -4311,6 +4298,7 @@ func TestResolveReferencesNoClusterServicePlan(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+*/
 
 // TestReconcileServiceInstanceUpdatePlan tests updating a
 // ServiceInstance with a new plan
@@ -4545,6 +4533,7 @@ func TestReconcileServiceInstanceWithUpdateFailure(t *testing.T) {
 	}
 }
 
+/*
 // TestResolveReferences tests that resolveReferences works
 // correctly and resolves references.
 func TestResolveReferencesWorks(t *testing.T) {
@@ -4742,6 +4731,7 @@ func TestResolveReferencesWorksK8SNames(t *testing.T) {
 	events := getRecordedEvents(testController)
 	assertNumEvents(t, events, 0)
 }
+*/
 
 // TestReconcileServiceInstanceUpdateAsynchronous tests updating a ServiceInstance
 // when the request results in an async response. Resulting status will indicate

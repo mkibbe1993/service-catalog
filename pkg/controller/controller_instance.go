@@ -262,11 +262,8 @@ func (c *controller) reconcileServiceInstanceAdd(instance *v1beta1.ServiceInstan
 	instance = instance.DeepCopy()
 
 	// Update references to ClusterServicePlan / ClusterServiceClass if necessary.
-	//
-	// TODO(mkibbe): Make this trigger another reconciliation instead of continuing.
-	instance, err := c.resolveReferences(instance)
-	if err != nil {
-		return err
+	if instance.Spec.ClusterServiceClassRef == nil || instance.Spec.ClusterServicePlanRef == nil {
+		return c.resolveReferences(instance)
 	}
 
 	glog.V(4).Info(pcb.Message("Processing adding event"))
@@ -366,11 +363,8 @@ func (c *controller) reconcileServiceInstanceUpdate(instance *v1beta1.ServiceIns
 	instance = instance.DeepCopy()
 
 	// Update references to ClusterServicePlan / ClusterServiceClass if necessary.
-	//
-	// TODO(mkibbe): Make this trigger another reconciliation instead of continuing.
-	instance, err := c.resolveReferences(instance)
-	if err != nil {
-		return err
+	if instance.Spec.ClusterServiceClassRef == nil || instance.Spec.ClusterServicePlanRef == nil {
+		return c.resolveReferences(instance)
 	}
 
 	glog.V(4).Info(pcb.Message("Processing updating event"))
@@ -749,17 +743,14 @@ func (c *controller) processServiceInstancePollingFailureRetryTimeout(instance *
 // nil and if so, will resolve the references and update the instance.
 // If either can not be resolved, returns an error and sets the InstanceCondition
 // with the appropriate error message.
-func (c *controller) resolveReferences(instance *v1beta1.ServiceInstance) (*v1beta1.ServiceInstance, error) {
-	if instance.Spec.ClusterServiceClassRef != nil && instance.Spec.ClusterServicePlanRef != nil {
-		return instance, nil
-	}
-
+func (c *controller) resolveReferences(instance *v1beta1.ServiceInstance) error {
+	pcb := pretty.NewContextBuilder(pretty.ServiceInstance, instance.Namespace, instance.Name)
 	var sc *v1beta1.ClusterServiceClass
 	var err error
 	if instance.Spec.ClusterServiceClassRef == nil {
 		instance, sc, err = c.resolveClusterServiceClassRef(instance)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
@@ -768,16 +759,20 @@ func (c *controller) resolveReferences(instance *v1beta1.ServiceInstance) (*v1be
 			var scErr error
 			sc, scErr = c.serviceClassLister.Get(instance.Spec.ClusterServiceClassRef.Name)
 			if scErr != nil {
-				return nil, fmt.Errorf(`Couldn't find ClusterServiceClass (K8S: %s)": %v`, instance.Spec.ClusterServiceClassRef.Name, scErr.Error())
+				return fmt.Errorf(pcb.Messagef(`Couldn't find ClusterServiceClass (K8S: %s)": %v`, instance.Spec.ClusterServiceClassRef.Name, scErr.Error()))
 			}
 		}
 
 		instance, err = c.resolveClusterServicePlanRef(instance, sc.Spec.ClusterServiceBrokerName)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
-	return c.updateServiceInstanceReferences(instance)
+	if _, err := c.updateServiceInstanceReferences(instance); err != nil {
+		return err
+	}
+
+	return fmt.Errorf(pcb.Message("resolved references; requeuing"))
 }
 
 // resolveClusterServiceClassRef resolves a reference  to a ClusterServiceClass
