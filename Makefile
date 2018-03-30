@@ -141,7 +141,9 @@ $(BINDIR)/service-catalog: .init .generate_files cmd/service-catalog
                 $(BINDIR)/client-gen \
                 $(BINDIR)/lister-gen \
                 $(BINDIR)/informer-gen \
-                $(BINDIR)/openapi-gen
+                $(BINDIR)/openapi-gen \
+		$(BINDIR)/go-to-protobuf \
+		$(BINDIR)/protoc-gen-gogo
 	touch $@
 
 $(BINDIR)/defaulter-gen: .init
@@ -161,6 +163,12 @@ $(BINDIR)/lister-gen: .init
 
 $(BINDIR)/informer-gen: .init
 	$(DOCKER_CMD) go build -o $@ $(SC_PKG)/vendor/k8s.io/code-generator/cmd/informer-gen
+
+$(BINDIR)/go-to-protobuf: .init
+	$(DOCKER_CMD) go build -o $@ $(SC_PKG)/vendor/k8s.io/code-generator/cmd/go-to-protobuf
+
+$(BINDIR)/protoc-gen-gogo: .init
+	$(DOCKER_CMD) go build -o $@ $(SC_PKG)/vendor/k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo
 
 $(BINDIR)/openapi-gen: vendor/k8s.io/code-generator/cmd/openapi-gen
 	$(DOCKER_CMD) go build -o $@ $(SC_PKG)/$^

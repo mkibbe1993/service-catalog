@@ -25,6 +25,15 @@ REPO_ROOT=$(realpath $(dirname "${BASH_SOURCE}")/..)
 BINDIR=${REPO_ROOT}/bin
 SC_PKG='github.com/kubernetes-incubator/service-catalog'
 
+# Generate protobufs
+PATH=${BINDIR}:${PATH} \
+         ${BINDIR}/go-to-protobuf "$@" \
+	 --v 1 --logtostderr \
+	 --go-header-file "vendor/github.com/kubernetes/repo-infra/verify/boilerplate/boilerplate.go.txt" \
+         --proto-import="${REPO_ROOT}/vendor" \
+         --proto-import="${REPO_ROOT}/third_party/protobuf" \
+         --packages="${SC_PKG}/pkg/apis/servicecatalog/v1beta1"
+
 # Generate defaults
 ${BINDIR}/defaulter-gen "$@" \
 	 --v 1 --logtostderr \

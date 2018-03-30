@@ -36,6 +36,31 @@ RUN apt-get update && apt-get install -y python-pip && \
     rm -rf /var/lib/apt/lists/*
 RUN pip install --disable-pip-version-check --no-cache-dir --upgrade cryptography azure-cli==${AZCLI_VERSION}
 
+# Install protoc
+#RUN curl -sSL -o protoc.zip https://github.com/google/protobuf/releases/download/v3.5.1/protoc-3.5.1-linux-x86_64.zip && \
+#    apt-get update && apt-get install -y unzip && \
+#    unzip -j protoc.zip bin/protoc -d /usr/local/bin/
+
+# Install g++, then download and install protoc for generating protobuf output
+RUN apt-get update \
+  && apt-get install -y g++ rsync jq apt-utils file patch \
+  && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /usr/local/src/protobuf \
+  && cd /usr/local/src/protobuf \
+  && curl -sSL https://github.com/google/protobuf/releases/download/v3.0.0-beta-2/protobuf-cpp-3.0.0-beta-2.tar.gz | tar -xzv \
+  && cd protobuf-3.0.0-beta-2 \
+  && ./configure \
+  && make install \
+  && ldconfig \
+  && cd .. \
+  && rm -rf protobuf-3.0.0-beta-2 \
+  && protoc --version
+
+# Get the code coverage tool and goimports
+RUN go get golang.org/x/tools/cmd/cover \
+            golang.org/x/tools/cmd/goimports
+
 # Create the full dir tree that we'll mount our src into when we run the image
 RUN mkdir -p /go/src/github.com/kubernetes-incubator/service-catalog
 
